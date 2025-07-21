@@ -57,20 +57,27 @@ export class TerrainManager {
         // Generate varied terrain based on noise and position
         const noiseValue = this.generateNoise(x, y);
 
-        if (noiseValue > 0.8) {
+        if (noiseValue > 0.7) {
           terrainType = "mountain";
           isPassable = false;
           movementCost = Infinity;
-        } else if (noiseValue > 0.6) {
+        } else if (noiseValue > 0.5) {
           terrainType = "forest";
           movementCost = 2;
-        } else if (noiseValue < 0.2 && distanceFromCenter > 15) {
+        } else if (noiseValue < 0.2 && distanceFromCenter > 10) {
           terrainType = "water";
           isPassable = false;
           movementCost = Infinity;
-        } else if (Math.random() > 0.95) {
+        } else if (Math.random() > 0.9) {
           terrainType = "road";
           movementCost = 0.5;
+        }
+
+        // Add random obstacles
+        if (isPassable && Math.random() > 0.95 && distanceFromCenter > 5) {
+          terrainType = "mountain";
+          isPassable = false;
+          movementCost = Infinity;
         }
 
         this.terrain[y][x] = {
@@ -81,6 +88,35 @@ export class TerrainManager {
         };
       }
     }
+
+    // Ensure spawn areas are clear
+    this.clearSpawnAreas();
+  }
+
+  private clearSpawnAreas(): void {
+    // Clear areas around player spawn points
+    const spawnAreas = [
+      { x: 5, y: 5 },     // Top-left spawn
+      { x: this.mapSize.width - 5, y: this.mapSize.height - 5 }, // Bottom-right spawn
+    ];
+
+    spawnAreas.forEach(spawn => {
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const x = spawn.x + dx;
+          const y = spawn.y + dy;
+          
+          if (x >= 0 && x < this.mapSize.width && y >= 0 && y < this.mapSize.height) {
+            this.terrain[y][x] = {
+              position: { x, y },
+              type: 'grass',
+              isPassable: true,
+              movementCost: 1,
+            };
+          }
+        }
+      }
+    });
   }
 
   private generateNoise(x: number, y: number): number {
@@ -299,21 +335,21 @@ export class TerrainManager {
       return false;
     }
 
-    // Check for building obstacles
+    // Check for building obstacles (buildings need more space)
     for (const building of buildings) {
       const distance = this.getDistance(position, building.position);
-      if (distance < 2) {
-        // Buildings block a 2x2 area
+      if (distance < 2.5) {
+        // Buildings block a larger area
         return false;
       }
     }
 
-    // Allow units to pass through each other (with some spacing)
-    const unitDensity = units.filter(
-      (unit) => this.getDistance(position, unit.position) < 0.5
-    ).length;
+    // More lenient unit collision (allow some overlap for better movement)
+    const nearbyUnits = units.filter(
+      (unit) => this.getDistance(position, unit.position) < 0.8
+    );
 
-    return unitDensity < 2; // Max 2 units per tile
+    return nearbyUnits.length < 1; // Only allow one unit per tile
   }
 
   private getMovementCost(position: Position): number {

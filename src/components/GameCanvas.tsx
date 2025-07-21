@@ -308,17 +308,37 @@ export const GameCanvas: React.FC = () => {
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     
     if (use3D && renderer3DRef.current) {
-      // 3D zoom
-      const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+      // 3D zoom - more responsive
+      const zoomDelta = e.deltaY > 0 ? -0.15 : 0.15;
       renderer3DRef.current.zoomCamera(zoomDelta);
     } else {
-      // 2D zoom
-      const newCamera = {
-        ...localCamera,
-        zoom: Math.max(0.2, Math.min(3, localCamera.zoom * zoomFactor)),
-      };
-      setLocalCamera(newCamera);
-      setCamera(newCamera);
+      // 2D zoom - improved with better limits and smoothness
+      const newZoom = Math.max(0.1, Math.min(5.0, localCamera.zoom * zoomFactor));
+      
+      // Calculate zoom center point relative to mouse position
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Convert mouse position to world coordinates
+        const worldX = localCamera.x + mouseX / (TILE_SIZE * localCamera.zoom);
+        const worldY = localCamera.y + mouseY / (TILE_SIZE * localCamera.zoom);
+        
+        // Adjust camera position to zoom towards mouse
+        const zoomRatio = newZoom / localCamera.zoom;
+        const newCameraX = worldX - (worldX - localCamera.x) / zoomRatio;
+        const newCameraY = worldY - (worldY - localCamera.y) / zoomRatio;
+        
+        const newCamera = {
+          x: Math.max(0, Math.min(mapSize.width - 10, newCameraX)),
+          y: Math.max(0, Math.min(mapSize.height - 10, newCameraY)),
+          zoom: newZoom,
+        };
+        
+        setLocalCamera(newCamera);
+        setCamera(newCamera);
+      }
     }
   };
 

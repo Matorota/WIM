@@ -60,6 +60,30 @@ export class Renderer3D {
     this.renderQueue = [];
   }
 
+  private getPlayerColor(playerId: string): string {
+    // Return distinct colors for different players
+    switch (playerId) {
+      case 'player': return '#4A90E2'; // Blue for human player
+      case 'ai': return '#E24A4A';     // Red for AI player
+      case 'ai1': return '#E24A4A';    // Red for AI player 1
+      case 'ai2': return '#FFA500';    // Orange for AI player 2
+      case 'ai3': return '#9B59B6';    // Purple for AI player 3
+      default: return '#808080';       // Gray for unknown players
+    }
+  }
+
+  private getUnitColor(playerId: string): string {
+    // Slightly different shades for units vs buildings
+    switch (playerId) {
+      case 'player': return '#2E8B57'; // Green for human player units
+      case 'ai': return '#CD5C5C';     // Red for AI units
+      case 'ai1': return '#CD5C5C';    // Red for AI player 1 units
+      case 'ai2': return '#FF8C00';    // Dark orange for AI player 2 units
+      case 'ai3': return '#8E44AD';    // Dark purple for AI player 3 units
+      default: return '#696969';       // Dark gray for unknown players
+    }
+  }
+
   private renderSky(): void {
     // Create sky gradient
     const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
@@ -83,7 +107,7 @@ export class Renderer3D {
         position: { x: building.position.x, y: building.position.y, z: this.getBuildingHeight(building.type) },
         rotation: { x: 0, y: 0, z: 0 },
         scale: { x: 2, y: 2, z: this.getBuildingHeight(building.type) },
-        color: building.playerId === 'player' ? '#4A90E2' : '#E24A4A',
+        color: this.getPlayerColor(building.playerId),
         model: building.type,
         health: building.health,
         maxHealth: building.maxHealth
@@ -101,7 +125,7 @@ export class Renderer3D {
         position: { x: unit.position.x, y: unit.position.y, z: 0.5 + bobOffset },
         rotation: { x: 0, y: this.getUnitRotation(unit), z: 0 },
         scale: { x: 1, y: 1, z: 1 },
-        color: unit.playerId === 'player' ? '#2E8B57' : '#CD5C5C',
+        color: this.getUnitColor(unit.playerId),
         model: unit.type,
         health: unit.health,
         maxHealth: unit.maxHealth
@@ -110,20 +134,47 @@ export class Renderer3D {
   }
 
   private addTerrainToQueue(): void {
-    // Add grid lines for terrain
-    for (let x = 0; x < 50; x += 5) {
-      for (let y = 0; y < 50; y += 5) {
+    // Add terrain tiles with varied appearance
+    for (let x = 0; x < 50; x += 1) {
+      for (let y = 0; y < 50; y += 1) {
+        // Sample terrain type at this position (this would come from TerrainManager in a real implementation)
+        const noiseValue = this.generateSimpleNoise(x, y);
+        let terrainColor = '#90EE90'; // Default grass
+        let isObstacle = false;
+        
+        if (noiseValue > 0.7) {
+          terrainColor = '#696969'; // Mountains
+          isObstacle = true;
+        } else if (noiseValue > 0.5) {
+          terrainColor = '#228B22'; // Forest
+        } else if (noiseValue < 0.2) {
+          terrainColor = '#4169E1'; // Water
+          isObstacle = true;
+        }
+        
         this.renderQueue.push({
           id: `terrain_${x}_${y}`,
           type: 'terrain',
-          position: { x, y, z: 0 },
+          position: { x, y, z: isObstacle ? 0.5 : 0 },
           rotation: { x: 0, y: 0, z: 0 },
-          scale: { x: 5, y: 5, z: 0.1 },
-          color: '#90EE90',
+          scale: { x: 1, y: 1, z: isObstacle ? 1 : 0.1 },
+          color: terrainColor,
           model: 'terrain_tile'
         });
       }
     }
+  }
+
+  private generateSimpleNoise(x: number, y: number): number {
+    // Simple noise function for terrain variation
+    const frequency = 0.1;
+    return (
+      (Math.sin(x * frequency) * Math.cos(y * frequency) +
+        Math.sin(x * frequency * 2) * Math.cos(y * frequency * 2) * 0.5 +
+        Math.sin(x * frequency * 4) * Math.cos(y * frequency * 4) * 0.25) /
+        1.75 +
+      0.5
+    );
   }
 
   private getBuildingHeight(buildingType: string): number {
@@ -302,12 +353,25 @@ export class Renderer3D {
   }
 
   private renderTerrain(_obj: RenderObject3D, screenPos: { x: number; y: number; scale: number }): void {
-    const size = 60 * screenPos.scale;
+    const size = 12 * screenPos.scale; // Smaller tiles for better detail
     
-    // Draw terrain tile with grid lines
-    this.ctx.strokeStyle = 'rgba(100, 150, 100, 0.3)';
-    this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(screenPos.x - size/2, screenPos.y - size/2, size, size);
+    // Draw terrain tile
+    this.ctx.fillStyle = _obj.color;
+    this.ctx.fillRect(screenPos.x - size/2, screenPos.y - size/2, size, size);
+    
+    // Add subtle grid lines for grass
+    if (_obj.color === '#90EE90') {
+      this.ctx.strokeStyle = 'rgba(100, 150, 100, 0.2)';
+      this.ctx.lineWidth = 0.5;
+      this.ctx.strokeRect(screenPos.x - size/2, screenPos.y - size/2, size, size);
+    }
+    
+    // Add texture for obstacles
+    if (_obj.position.z > 0.2) {
+      // Mountains or obstacles - add some texture
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      this.ctx.fillRect(screenPos.x - size/2 + 1, screenPos.y - size/2 + 1, size - 2, size - 2);
+    }
   }
 
   private addBuildingDetails(buildingType: string, screenPos: { x: number; y: number; scale: number }, size: number): void {

@@ -12,8 +12,13 @@ import type {
 } from "../types/game";
 import { v4 as uuidv4 } from "uuid";
 import { gameManager } from "../systems/GameManager";
+import ResourceManager from "../systems/ResourceManager";
+import type { ResourceNode } from "../systems/ResourceManager";
 
 interface GameStore extends GameState {
+  // Resource system
+  resourceManager: ResourceManager | null;
+  
   // Game controls
   startGame: (config: any) => void;
   pauseGame: () => void;
@@ -36,6 +41,12 @@ interface GameStore extends GameState {
 
   // Camera controls
   setCamera: (camera: { x: number; y: number; zoom: number }) => void;
+
+  // Resource management
+  getResourceNodes: () => ResourceNode[];
+  assignWorkerToNode: (workerId: string, nodeId: string) => void;
+  removeWorkerFromNode: (workerId: string) => void;
+  extractResources: (nodeId: string, deltaTime: number) => { type: 'oil' | 'steel' | 'energy'; amount: number } | null;
 
   // Game logic
   tick: () => void;
@@ -87,6 +98,7 @@ export const useGameStore = create<GameStore>()(
     gameMode: "singleplayer",
     victoryCondition: "domination",
     gameTime: 0,
+    resourceManager: null,
 
     // Actions
     startGame: (config) => {
@@ -163,6 +175,9 @@ export const useGameStore = create<GameStore>()(
         }
       });
 
+      // Initialize ResourceManager with map dimensions
+      const resourceManager = new ResourceManager({ width: mapWidth, height: mapHeight });
+
       set({
         gameId,
         isGameStarted: true,
@@ -176,6 +191,7 @@ export const useGameStore = create<GameStore>()(
         victoryCondition: config.victoryCondition || "domination",
         gameTime: 0,
         currentTick: 0,
+        resourceManager,
       });
 
       // Initialize AI after game setup
@@ -382,6 +398,34 @@ export const useGameStore = create<GameStore>()(
       set({ fogOfWar: newFogOfWar });
     },
 
+    // Resource management methods
+    getResourceNodes: () => {
+      const { resourceManager } = get();
+      return resourceManager ? resourceManager.getResourceNodes() : [];
+    },
+
+    assignWorkerToNode: (workerId: string, nodeId: string) => {
+      const { resourceManager } = get();
+      if (resourceManager) {
+        resourceManager.assignWorkerToNode(workerId, nodeId);
+      }
+    },
+
+    removeWorkerFromNode: (workerId: string) => {
+      const { resourceManager } = get();
+      if (resourceManager) {
+        resourceManager.removeWorkerFromNode(workerId);
+      }
+    },
+
+    extractResources: (nodeId: string, deltaTime: number) => {
+      const { resourceManager } = get();
+      if (resourceManager) {
+        return resourceManager.extractResources(nodeId, deltaTime);
+      }
+      return null;
+    },
+
     tick: () => {
       const state = get();
       if (!state.isGameStarted || state.isPaused) return;
@@ -475,7 +519,9 @@ export const useGameStore = create<GameStore>()(
         const playerBuildings = updatedBuildings.filter(
           (b) => b.playerId === player.id && b.isConstructed
         );
-        const resourceGain = {
+        
+        // Traditional building-based resource generation
+        const buildingResourceGain = {
           oil:
             playerBuildings.filter((b) => b.type === "oil_refinery").length *
             10,
@@ -488,13 +534,42 @@ export const useGameStore = create<GameStore>()(
             20,
         };
 
+        // Resource node extraction (using deltaTime of 1000/60 ms per tick)
+        let nodeResourceGain = { oil: 0, steel: 0, energy: 0 };
+        if (state.resourceManager) {
+          const nodes = state.resourceManager.getResourceNodes();
+          nodes.forEach(node => {
+            if (node.workersAssigned.length > 0) {
+              // Check if any workers belong to this player
+              const playerWorkers = node.workersAssigned.filter(workerId => {
+                const worker = state.units.find(u => u.id === workerId && u.playerId === player.id);
+                return worker !== undefined;
+              });
+              
+              if (playerWorkers.length > 0) {
+                const extraction = state.resourceManager!.extractResources(node.id, 1000/60);
+                if (extraction) {
+                  nodeResourceGain[extraction.type] += extraction.amount;
+                }
+              }
+            }
+          });
+        }
+
+        const totalResourceGain = {
+          oil: buildingResourceGain.oil + nodeResourceGain.oil,
+          steel: buildingResourceGain.steel + nodeResourceGain.steel,
+          energy: buildingResourceGain.energy + nodeResourceGain.energy,
+          money: buildingResourceGain.money,
+        };
+
         return {
           ...player,
           resources: {
-            oil: player.resources.oil + resourceGain.oil,
-            steel: player.resources.steel + resourceGain.steel,
-            energy: player.resources.energy + resourceGain.energy,
-            money: player.resources.money + resourceGain.money,
+            oil: player.resources.oil + totalResourceGain.oil,
+            steel: player.resources.steel + totalResourceGain.steel,
+            energy: player.resources.energy + totalResourceGain.energy,
+            money: player.resources.money + totalResourceGain.money,
           },
         };
       });

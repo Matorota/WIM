@@ -241,24 +241,31 @@ export class AdvancedAI {
     // Intelligent building construction based on queue and resources
     const totalResources = player.resources.oil + player.resources.steel + player.resources.energy;
     
-    if (currentTime >= this.strategicState.economicPlan.nextBuildTime && totalResources >= 200) {
+    // Only build if we have significant resources and haven't built recently
+    if (currentTime >= this.strategicState.economicPlan.nextBuildTime && 
+        totalResources >= 300 && // Higher threshold
+        this.shouldBuildMore(myBuildings, totalResources)) {
+      
       if (this.strategicState.economicPlan.buildingQueue.length > 0) {
         const nextBuilding = this.strategicState.economicPlan.buildingQueue.shift()!;
         
         // Check if we have required resources for this specific building
         if (this.canAffordBuilding(nextBuilding, player.resources)) {
           this.tryBuildBuilding(nextBuilding, myBuildings);
-          this.strategicState.economicPlan.nextBuildTime = currentTime + 5000; // Wait 5 seconds between builds
+          this.strategicState.economicPlan.nextBuildTime = currentTime + 15000; // Wait 15 seconds between builds
           
           // Replenish building queue based on current needs
           this.updateBuildingQueue(myBuildings, myUnits.length);
         } else {
           // Put building back at front of queue if can't afford
           this.strategicState.economicPlan.buildingQueue.unshift(nextBuilding);
+          this.strategicState.economicPlan.nextBuildTime = currentTime + 5000; // Wait 5 seconds before retrying
         }
       } else {
-        // Generate new building queue if empty
-        this.updateBuildingQueue(myBuildings, myUnits.length);
+        // Generate new building queue if empty, but only if needed
+        if (this.needsMoreBuildings(myBuildings, myUnits.length)) {
+          this.updateBuildingQueue(myBuildings, myUnits.length);
+        }
       }
     }
 
@@ -294,32 +301,47 @@ export class AdvancedAI {
       defense_turret: myBuildings.filter(b => b.type === 'defense_turret').length,
     };
 
-    // Smart building priorities based on current state
-    if (buildingCounts.power_plant < 2) {
+    // Smart building priorities based on current state - more conservative
+    if (buildingCounts.power_plant < 1) {
       this.strategicState.economicPlan.buildingQueue.push('power_plant');
     }
     
-    if (buildingCounts.barracks < 2) {
+    if (buildingCounts.barracks < 1) {
       this.strategicState.economicPlan.buildingQueue.push('barracks');
     }
     
-    if (buildingCounts.vehicle_factory < 1 && totalUnits > 5) {
+    if (buildingCounts.vehicle_factory < 1 && totalUnits > 8) {
       this.strategicState.economicPlan.buildingQueue.push('vehicle_factory');
     }
     
-    if (buildingCounts.defense_turret < 3) {
+    if (buildingCounts.defense_turret < 2) {
       this.strategicState.economicPlan.buildingQueue.push('defense_turret');
     }
 
-    // Add more production facilities as army grows
-    if (totalUnits > 10) {
-      if (buildingCounts.barracks < 3) {
+    // Add more production facilities only if army is large
+    if (totalUnits > 15) {
+      if (buildingCounts.barracks < 2) {
         this.strategicState.economicPlan.buildingQueue.push('barracks');
       }
-      if (buildingCounts.vehicle_factory < 2) {
-        this.strategicState.economicPlan.buildingQueue.push('vehicle_factory');
+      if (buildingCounts.power_plant < 2) {
+        this.strategicState.economicPlan.buildingQueue.push('power_plant');
       }
     }
+  }
+
+  private shouldBuildMore(myBuildings: Building[], totalResources: number): boolean {
+    // Don't build if we have too many buildings relative to resources
+    const buildingCount = myBuildings.length;
+    const resourceThreshold = buildingCount * 400; // Each building should cost about 400 resources
+    
+    return totalResources > resourceThreshold && buildingCount < 8; // Max 8 buildings
+  }
+
+  private needsMoreBuildings(myBuildings: Building[], totalUnits: number): boolean {
+    const buildingCount = myBuildings.length;
+    
+    // Only build more buildings if we have a good unit-to-building ratio
+    return (totalUnits / Math.max(1, buildingCount)) > 3 && buildingCount < 6;
   }
 
   private assignWorkersToResources(myUnits: Unit[]): void {
