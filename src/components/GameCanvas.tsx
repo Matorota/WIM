@@ -1,8 +1,24 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useGameStore } from "../store/gameStore";
+import type { Position } from "../types/game";
+import AdvancedRenderer from "../graphics/AdvancedRenderer";
+import Renderer3D from "../graphics/Renderer3D";
 
 export const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<AdvancedRenderer | null>(null);
+  const renderer3DRef = useRef<Renderer3D | null>(null);
+  const [use3D, setUse3D] = useState(true); // Toggle for 3D mode
+  const [localCamera, setLocalCamera] = useState({ x: 0, y: 0, zoom: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<Position>({
+    x: 0,
+    y: 0,
+  });
+  const [selectionEnd, setSelectionEnd] = useState<Position>({ x: 0, y: 0 });
+
   const {
     units,
     buildings,
@@ -22,309 +38,342 @@ export const GameCanvas: React.FC = () => {
   const CANVAS_WIDTH = 1200;
   const CANVAS_HEIGHT = 800;
 
-  const drawGame = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      // Clear canvas
-      ctx.fillStyle = "#1a1a1a";
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      // Draw grid
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 1;
-      for (let x = 0; x < mapSize.width; x++) {
-        const screenX = (x - camera.x) * TILE_SIZE * camera.zoom;
-        if (screenX >= -TILE_SIZE && screenX <= CANVAS_WIDTH) {
-          ctx.beginPath();
-          ctx.moveTo(screenX, 0);
-          ctx.lineTo(screenX, CANVAS_HEIGHT);
-          ctx.stroke();
-        }
-      }
-      for (let y = 0; y < mapSize.height; y++) {
-        const screenY = (y - camera.y) * TILE_SIZE * camera.zoom;
-        if (screenY >= -TILE_SIZE && screenY <= CANVAS_HEIGHT) {
-          ctx.beginPath();
-          ctx.moveTo(0, screenY);
-          ctx.lineTo(CANVAS_WIDTH, screenY);
-          ctx.stroke();
-        }
-      }
-
-      // Draw fog of war
-      if (fogOfWar.length > 0) {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        for (let y = 0; y < fogOfWar.length; y++) {
-          for (let x = 0; x < fogOfWar[y].length; x++) {
-            if (fogOfWar[y][x]) {
-              const screenX = (x - camera.x) * TILE_SIZE * camera.zoom;
-              const screenY = (y - camera.y) * TILE_SIZE * camera.zoom;
-              ctx.fillRect(
-                screenX,
-                screenY,
-                TILE_SIZE * camera.zoom,
-                TILE_SIZE * camera.zoom
-              );
-            }
-          }
-        }
-      }
-
-      // Draw buildings
-      buildings.forEach((building) => {
-        const screenX =
-          (building.position.x - camera.x) * TILE_SIZE * camera.zoom;
-        const screenY =
-          (building.position.y - camera.y) * TILE_SIZE * camera.zoom;
-        const size = TILE_SIZE * camera.zoom * 2;
-
-        // Check if building is in fog of war
-        const fogX = Math.floor(building.position.x);
-        const fogY = Math.floor(building.position.y);
-        if (fogOfWar[fogY] && fogOfWar[fogY][fogX]) return;
-
-        // Building color based on player
-        const player = useGameStore
-          .getState()
-          .players.find((p) => p.id === building.playerId);
-        ctx.fillStyle = player?.color || "#666";
-
-        // Building shape based on type
-        if (building.type === "command_center") {
-          ctx.fillRect(screenX, screenY, size, size);
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(
-            screenX + size / 4,
-            screenY + size / 4,
-            size / 2,
-            size / 2
-          );
-        } else if (building.type === "barracks") {
-          ctx.fillRect(screenX, screenY, size * 0.8, size * 0.6);
-        } else {
-          ctx.fillRect(screenX, screenY, size * 0.7, size * 0.7);
-        }
-
-        // Selection highlight
-        if (selectedBuildings.includes(building.id)) {
-          ctx.strokeStyle = "#ffff00";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
-        }
-
-        // Health bar
-        if (building.health < building.maxHealth) {
-          const barWidth = size;
-          const barHeight = 4;
-          const healthPercent = building.health / building.maxHealth;
-
-          ctx.fillStyle = "#ff0000";
-          ctx.fillRect(screenX, screenY - 8, barWidth, barHeight);
-          ctx.fillStyle = "#00ff00";
-          ctx.fillRect(
-            screenX,
-            screenY - 8,
-            barWidth * healthPercent,
-            barHeight
-          );
-        }
-
-        // Construction progress
-        if (!building.isConstructed) {
-          const progressPercent = building.constructionProgress / 100;
-          ctx.fillStyle = "rgba(255, 255, 0, 0.3)";
-          ctx.fillRect(screenX, screenY + size - 6, size * progressPercent, 6);
-        }
+  // Initialize renderer
+  useEffect(() => {
+    if (canvasRef.current && !rendererRef.current && !renderer3DRef.current) {
+      rendererRef.current = new AdvancedRenderer({
+        canvas: canvasRef.current,
+        tileSize: TILE_SIZE,
+        camera: localCamera,
+        mapSize,
       });
+      
+      // Initialize 3D renderer
+      renderer3DRef.current = new Renderer3D(canvasRef.current);
+    }
+  }, [localCamera, mapSize]);
 
-      // Draw units
-      units.forEach((unit) => {
-        const screenX = (unit.position.x - camera.x) * TILE_SIZE * camera.zoom;
-        const screenY = (unit.position.y - camera.y) * TILE_SIZE * camera.zoom;
-        const size = TILE_SIZE * camera.zoom * 0.8;
+  // Update local camera when store camera changes
+  useEffect(() => {
+    setLocalCamera(camera);
+  }, [camera]);
 
-        // Check if unit is in fog of war
-        const fogX = Math.floor(unit.position.x);
-        const fogY = Math.floor(unit.position.y);
-        if (fogOfWar[fogY] && fogOfWar[fogY][fogX]) return;
-
-        // Unit color based on player
-        const player = useGameStore
-          .getState()
-          .players.find((p) => p.id === unit.playerId);
-        ctx.fillStyle = player?.color || "#666";
-
-        // Unit shape based on type
-        if (unit.type === "infantry") {
-          ctx.beginPath();
-          ctx.arc(
-            screenX + size / 2,
-            screenY + size / 2,
-            size / 3,
-            0,
-            Math.PI * 2
-          );
-          ctx.fill();
-        } else if (unit.type === "tank") {
-          ctx.fillRect(screenX, screenY, size, size * 0.8);
-          // Tank cannon
-          ctx.fillStyle = "#888";
-          ctx.fillRect(screenX + size / 2 - 2, screenY - 5, 4, size / 2);
-        } else if (unit.type === "jet") {
-          // Triangle for jet
-          ctx.beginPath();
-          ctx.moveTo(screenX + size / 2, screenY);
-          ctx.lineTo(screenX, screenY + size);
-          ctx.lineTo(screenX + size, screenY + size);
-          ctx.closePath();
-          ctx.fill();
-        } else {
-          // Default square
-          ctx.fillRect(screenX, screenY, size, size);
-        }
-
-        // Selection highlight
-        if (selectedUnits.includes(unit.id)) {
-          ctx.strokeStyle = "#ffff00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(screenX - 2, screenY - 2, size + 4, size + 4);
-        }
-
-        // Health bar
-        if (unit.health < unit.maxHealth) {
-          const barWidth = size;
-          const barHeight = 3;
-          const healthPercent = unit.health / unit.maxHealth;
-
-          ctx.fillStyle = "#ff0000";
-          ctx.fillRect(screenX, screenY - 6, barWidth, barHeight);
-          ctx.fillStyle = "#00ff00";
-          ctx.fillRect(
-            screenX,
-            screenY - 6,
-            barWidth * healthPercent,
-            barHeight
-          );
-        }
-
-        // Movement target
-        if (unit.target && selectedUnits.includes(unit.id)) {
-          const targetScreenX =
-            (unit.target.x - camera.x) * TILE_SIZE * camera.zoom;
-          const targetScreenY =
-            (unit.target.y - camera.y) * TILE_SIZE * camera.zoom;
-
-          ctx.strokeStyle = "#00ff00";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.moveTo(screenX + size / 2, screenY + size / 2);
-          ctx.lineTo(targetScreenX, targetScreenY);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      });
-    },
-    [
-      units,
-      buildings,
-      mapSize,
-      camera,
-      fogOfWar,
-      selectedUnits,
-      selectedBuildings,
-    ]
-  );
-
+  // Handle canvas resize
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const resizeCanvas = () => {
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
 
-    drawGame(ctx);
-  }, [drawGame]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    // Convert screen coordinates to world coordinates
-    const worldX = clickX / (TILE_SIZE * camera.zoom) + camera.x;
-    const worldY = clickY / (TILE_SIZE * camera.zoom) + camera.y;
-
-    // Check if clicking on a unit or building
-    let clickedSomething = false;
-
-    // Check buildings first
-    for (const building of buildings) {
-      const distance = Math.sqrt(
-        Math.pow(worldX - building.position.x, 2) +
-          Math.pow(worldY - building.position.y, 2)
-      );
-      if (distance < 2 && building.playerId === currentPlayerId) {
-        selectBuildings([building.id]);
-        clickedSomething = true;
-        break;
+      if (rendererRef.current) {
+        rendererRef.current.updateConfig({
+          canvas,
+          camera: localCamera,
+          tileSize: TILE_SIZE * localCamera.zoom,
+          mapSize,
+        });
       }
+    };
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    return () => window.removeEventListener("resize", resizeCanvas);
+  }, [localCamera, mapSize]);
+
+  // Enhanced render function using AdvancedRenderer or 3D Renderer
+  const render = useCallback(() => {
+    if (use3D && renderer3DRef.current) {
+      // Use 3D renderer
+      renderer3DRef.current.render(units, buildings, 16); // ~60 FPS
+      
+      // Update camera from local camera
+      renderer3DRef.current.setCamera({ x: localCamera.x, y: localCamera.y });
+    } else if (rendererRef.current) {
+      // Use 2D renderer
+      rendererRef.current.updateConfig({
+        camera: localCamera,
+        tileSize: TILE_SIZE,
+        mapSize,
+      });
+
+      // Render using the advanced renderer
+      rendererRef.current.render(
+        units,
+        buildings,
+        fogOfWar,
+        selectedUnits,
+        selectedBuildings
+      );
     }
 
-    if (!clickedSomething) {
-      // Check units
-      for (const unit of units) {
-        const distance = Math.sqrt(
-          Math.pow(worldX - unit.position.x, 2) +
-            Math.pow(worldY - unit.position.y, 2)
-        );
-        if (distance < 1 && unit.playerId === currentPlayerId) {
-          if (e.ctrlKey) {
-            // Add to selection
-            selectUnits([...selectedUnits, unit.id]);
-          } else {
-            selectUnits([unit.id]);
-          }
-          clickedSomething = true;
-          break;
+    // Draw selection box if selecting
+    if (isSelecting) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.strokeStyle = "#ffff00";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.strokeRect(
+            Math.min(selectionStart.x, selectionEnd.x),
+            Math.min(selectionStart.y, selectionEnd.y),
+            Math.abs(selectionEnd.x - selectionStart.x),
+            Math.abs(selectionEnd.y - selectionStart.y)
+          );
+          ctx.setLineDash([]);
         }
       }
     }
+  }, [
+    units,
+    buildings,
+    fogOfWar,
+    selectedUnits,
+    selectedBuildings,
+    localCamera,
+    mapSize,
+    isSelecting,
+    selectionStart,
+    selectionEnd,
+  ]);
 
-    // If nothing was clicked and we have units selected, move them
-    if (!clickedSomething && selectedUnits.length > 0) {
-      moveUnitsTo({ x: worldX, y: worldY });
+  useEffect(() => {
+    render();
+  }, [render]);
+
+  const screenToWorld = (screenX: number, screenY: number): Position => {
+    return {
+      x: localCamera.x + screenX / (TILE_SIZE * localCamera.zoom),
+      y: localCamera.y + screenY / (TILE_SIZE * localCamera.zoom),
+    };
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (e.button === 2) {
+      // Right click
+      e.preventDefault();
+      const worldPos = screenToWorld(x, y);
+
+      if (selectedUnits.length > 0) {
+        moveUnitsTo(worldPos);
+
+        // Add movement animation for selected units
+        if (rendererRef.current) {
+          selectedUnits.forEach((unitId) => {
+            const unit = units.find((u) => u.id === unitId);
+            if (unit) {
+              rendererRef.current!.addAnimation({
+                id: `move_${unitId}`,
+                startTime: Date.now(),
+                duration: 1000,
+                fromPosition: unit.position,
+                toPosition: worldPos,
+                type: "movement",
+              });
+            }
+          });
+        }
+      }
+      return;
     }
 
-    // Clear selection if nothing was clicked
-    if (!clickedSomething && !e.ctrlKey) {
-      selectUnits([]);
-      selectBuildings([]);
+    if (e.button === 0) {
+      // Left click
+      if (e.shiftKey) {
+        // Start selection box
+        setIsSelecting(true);
+        setSelectionStart({ x, y });
+        setSelectionEnd({ x, y });
+      } else {
+        const worldPos = screenToWorld(x, y);
+
+        // Single unit/building selection
+        let clickedSomething = false;
+
+        // Check buildings first
+        for (const building of buildings) {
+          const distance = Math.sqrt(
+            Math.pow(worldPos.x - building.position.x, 2) +
+              Math.pow(worldPos.y - building.position.y, 2)
+          );
+          if (distance < 2 && building.playerId === currentPlayerId) {
+            selectBuildings([building.id]);
+            clickedSomething = true;
+            break;
+          }
+        }
+
+        if (!clickedSomething) {
+          // Check units
+          for (const unit of units) {
+            const distance = Math.sqrt(
+              Math.pow(worldPos.x - unit.position.x, 2) +
+                Math.pow(worldPos.y - unit.position.y, 2)
+            );
+            if (distance < 1 && unit.playerId === currentPlayerId) {
+              selectUnits([unit.id]);
+              clickedSomething = true;
+              break;
+            }
+          }
+        }
+
+        if (!clickedSomething) {
+          // Clear selection and start panning
+          selectUnits([]);
+          selectBuildings([]);
+          setIsDragging(true);
+          setDragStart({ x: e.clientX, y: e.clientY });
+        }
+      }
     }
   };
 
-  const handleMouseMove = (_e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Camera panning could be implemented here
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (isSelecting) {
+      setSelectionEnd({ x, y });
+    } else if (isDragging) {
+      const deltaX = (e.clientX - dragStart.x) / (TILE_SIZE * localCamera.zoom);
+      const deltaY = (e.clientY - dragStart.y) / (TILE_SIZE * localCamera.zoom);
+
+      if (use3D && renderer3DRef.current) {
+        // 3D camera movement
+        renderer3DRef.current.moveCamera(-deltaX * 0.1, -deltaY * 0.1);
+      } else {
+        // 2D camera movement
+        const newCamera = {
+          ...localCamera,
+          x: localCamera.x - deltaX,
+          y: localCamera.y - deltaY,
+        };
+
+        setLocalCamera(newCamera);
+        setCamera(newCamera);
+      }
+      
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+  const handleMouseUp = () => {
+    if (isSelecting) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const startWorld = screenToWorld(selectionStart.x, selectionStart.y);
+        const endWorld = screenToWorld(selectionEnd.x, selectionEnd.y);
+
+        const minX = Math.min(startWorld.x, endWorld.x);
+        const maxX = Math.max(startWorld.x, endWorld.x);
+        const minY = Math.min(startWorld.y, endWorld.y);
+        const maxY = Math.max(startWorld.y, endWorld.y);
+
+        // Select units in area
+        const selectedUnitIds: string[] = [];
+        units.forEach((unit) => {
+          if (
+            unit.playerId === currentPlayerId &&
+            unit.position.x >= minX &&
+            unit.position.x <= maxX &&
+            unit.position.y >= minY &&
+            unit.position.y <= maxY
+          ) {
+            selectedUnitIds.push(unit.id);
+          }
+        });
+        selectUnits(selectedUnitIds);
+      }
+      setIsSelecting(false);
+    }
+
+    setIsDragging(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.5, Math.min(3, camera.zoom * zoomFactor));
-    setCamera({ ...camera, zoom: newZoom });
+    
+    if (use3D && renderer3DRef.current) {
+      // 3D zoom
+      const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+      renderer3DRef.current.zoomCamera(zoomDelta);
+    } else {
+      // 2D zoom
+      const newCamera = {
+        ...localCamera,
+        zoom: Math.max(0.2, Math.min(3, localCamera.zoom * zoomFactor)),
+      };
+      setLocalCamera(newCamera);
+      setCamera(newCamera);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
-      onClick={handleCanvasClick}
-      onMouseMove={handleMouseMove}
-      onWheel={handleWheel}
-      className="border border-gray-600 bg-gray-900 cursor-crosshair"
-    />
+    <div className="relative w-full h-full bg-gray-900 overflow-hidden">
+      {/* 3D Toggle Button */}
+      <button
+        onClick={() => setUse3D(!use3D)}
+        className={`absolute top-4 right-4 z-10 px-4 py-2 rounded font-semibold transition-colors ${
+          use3D 
+            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+            : 'bg-gray-600 text-white hover:bg-gray-700'
+        }`}
+      >
+        {use3D ? '3D Mode' : '2D Mode'}
+      </button>
+      
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onWheel={handleWheel}
+        onContextMenu={handleContextMenu}
+        className="w-full h-full border border-gray-700 bg-gray-900 cursor-crosshair"
+        style={{ maxWidth: "100%", maxHeight: "100%" }}
+      />
+
+      {/* Controls overlay */}
+      <div className="absolute top-4 left-4 bg-black bg-opacity-75 text-white p-3 rounded-lg text-sm">
+        <div className="space-y-1">
+          <div>Left Click: Select unit/building</div>
+          <div>Shift + Left Click + Drag: Select multiple units</div>
+          <div>Right Click: Move selected units</div>
+          <div>Mouse Wheel: Zoom in/out</div>
+          <div>Drag: Pan camera</div>
+        </div>
+      </div>
+
+      {/* Info overlay */}
+      <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white p-2 rounded text-sm">
+        <div>Zoom: {Math.round(localCamera.zoom * 100)}%</div>
+        <div>
+          Selected: {selectedUnits.length} units, {selectedBuildings.length}{" "}
+          buildings
+        </div>
+      </div>
+    </div>
   );
 };
+
+export default GameCanvas;
