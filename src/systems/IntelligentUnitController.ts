@@ -1,5 +1,5 @@
-import type { Unit, Building, Position, UnitType } from '../types/game';
-import { TerrainManager } from './TerrainManager';
+import type { Unit, Building, Position, UnitType } from "../types/game";
+import { TerrainManager } from "./TerrainManager";
 
 export interface UnitCommand {
   id: string;

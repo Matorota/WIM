@@ -1,6 +1,6 @@
-import React from 'react';
-import { useRTSGameStore } from '../store/rtsGameStore';
-import type { UnitType, BuildingType } from '../types/rts-game';
+import React from "react";
+import { useRTSGameStore } from "../store/rtsGameStore";
+import type { UnitType, BuildingType } from "../types/rts-game";
 
 export const GameUI: React.FC = () => {
   const {
@@ -14,9 +14,15 @@ export const GameUI: React.FC = () => {
     canAfford,
   } = useRTSGameStore();
 
-  const currentPlayer = players.find(p => p.id === currentPlayerId);
-  const selectedUnit = selectedUnits.length === 1 ? units.find(u => u.id === selectedUnits[0]) : null;
-  const selectedBuilding = selectedBuildings.length === 1 ? buildings.find(b => b.id === selectedBuildings[0]) : null;
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
+  const selectedUnit =
+    selectedUnits.length === 1
+      ? units.find((u) => u.id === selectedUnits[0])
+      : null;
+  const selectedBuilding =
+    selectedBuildings.length === 1
+      ? buildings.find((b) => b.id === selectedBuildings[0])
+      : null;
 
   if (!currentPlayer) return null;
 
@@ -83,10 +89,15 @@ export const GameUI: React.FC = () => {
         <h3 className="text-lg font-bold mb-2">Selected Unit</h3>
         <div className="space-y-2">
           <div>Type: {selectedUnit.type}</div>
-          <div>Health: {selectedUnit.health}/{selectedUnit.maxHealth}</div>
+          <div>
+            Health: {selectedUnit.health}/{selectedUnit.maxHealth}
+          </div>
           <div>Task: {selectedUnit.task}</div>
           {selectedUnit.carryingResources && (
-            <div>Carrying: {selectedUnit.carryingResources.amount} {selectedUnit.carryingResources.type}</div>
+            <div>
+              Carrying: {selectedUnit.carryingResources.amount}{" "}
+              {selectedUnit.carryingResources.type}
+            </div>
           )}
         </div>
       </div>
@@ -96,24 +107,47 @@ export const GameUI: React.FC = () => {
   const BuildingPanel = () => {
     if (!selectedBuilding) return null;
 
-    const canTrainUnits = ['town_center', 'barracks', 'archery_range', 'stable', 'factory'].includes(selectedBuilding.type);
-    const availableUnits: UnitType[] = 
-      selectedBuilding.type === 'town_center' ? ['villager'] :
-      selectedBuilding.type === 'barracks' ? ['soldier'] :
-      selectedBuilding.type === 'archery_range' ? ['archer'] :
-      selectedBuilding.type === 'stable' ? ['cavalry'] :
-      selectedBuilding.type === 'factory' ? ['tank', 'engineer'] :
-      [];
+    const canTrainUnits = [
+      "town_center",
+      "barracks",
+      "archery_range",
+      "stable",
+      "factory",
+    ].includes(selectedBuilding.type);
+    const availableUnits: UnitType[] =
+      selectedBuilding.type === "town_center"
+        ? ["villager"]
+        : selectedBuilding.type === "barracks"
+        ? ["soldier"]
+        : selectedBuilding.type === "archery_range"
+        ? ["archer"]
+        : selectedBuilding.type === "stable"
+        ? ["cavalry"]
+        : selectedBuilding.type === "factory"
+        ? ["tank", "engineer"]
+        : [];
 
     return (
       <div className="bg-gray-800 text-white p-4 rounded">
         <h3 className="text-lg font-bold mb-2">Selected Building</h3>
         <div className="space-y-2 mb-4">
-          <div>Type: {selectedBuilding.type.replace('_', ' ')}</div>
-          <div>Health: {selectedBuilding.health}/{selectedBuilding.maxHealth}</div>
-          <div>Status: {selectedBuilding.isConstructed ? 'Complete' : `${selectedBuilding.constructionProgress}%`}</div>
+          <div>Type: {selectedBuilding.type.replace("_", " ")}</div>
+          <div>
+            Health: {selectedBuilding.health}/{selectedBuilding.maxHealth}
+          </div>
+          <div>
+            Status:{" "}
+            {selectedBuilding.isConstructed
+              ? "Complete"
+              : `${selectedBuilding.constructionProgress}%`}
+          </div>
           {selectedBuilding.productionQueue.length > 0 && (
-            <div>Queue: {selectedBuilding.productionQueue.map(item => item.type).join(', ')}</div>
+            <div>
+              Queue:{" "}
+              {selectedBuilding.productionQueue
+                .map((item) => item.type)
+                .join(", ")}
+            </div>
           )}
         </div>
 
@@ -121,19 +155,19 @@ export const GameUI: React.FC = () => {
           <div>
             <h4 className="font-semibold mb-2">Train Units</h4>
             <div className="grid grid-cols-2 gap-2">
-              {availableUnits.map(unitType => {
+              {availableUnits.map((unitType) => {
                 const cost = unitCosts[unitType];
                 const affordable = canAfford(currentPlayerId, cost);
-                
+
                 return (
                   <button
                     key={unitType}
                     onClick={() => handleTrainUnit(unitType)}
                     disabled={!affordable}
                     className={`p-2 rounded text-sm ${
-                      affordable 
-                        ? 'bg-blue-600 hover:bg-blue-700' 
-                        : 'bg-gray-600 cursor-not-allowed'
+                      affordable
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-gray-600 cursor-not-allowed"
                     }`}
                   >
                     <div>{unitType}</div>
@@ -154,26 +188,33 @@ export const GameUI: React.FC = () => {
   };
 
   const BuildingMenu = () => {
-    const canBuild = selectedUnits.some(unitId => {
-      const unit = units.find(u => u.id === unitId);
-      return unit && (unit.type === 'villager' || unit.type === 'engineer');
+    const canBuild = selectedUnits.some((unitId) => {
+      const unit = units.find((u) => u.id === unitId);
+      return unit && (unit.type === "villager" || unit.type === "engineer");
     });
 
     if (!canBuild) return null;
 
     const buildingTypes: BuildingType[] = [
-      'house', 'barracks', 'archery_range', 'stable', 'factory',
-      'farm', 'lumber_mill', 'mining_camp', 'tower'
+      "house",
+      "barracks",
+      "archery_range",
+      "stable",
+      "factory",
+      "farm",
+      "lumber_mill",
+      "mining_camp",
+      "tower",
     ];
 
     return (
       <div className="bg-gray-800 text-white p-4 rounded">
         <h3 className="text-lg font-bold mb-2">Build</h3>
         <div className="grid grid-cols-3 gap-2">
-          {buildingTypes.map(buildingType => {
+          {buildingTypes.map((buildingType) => {
             const cost = buildingCosts[buildingType];
             const affordable = canAfford(currentPlayerId, cost);
-            
+
             return (
               <button
                 key={buildingType}
@@ -183,12 +224,12 @@ export const GameUI: React.FC = () => {
                 }}
                 disabled={!affordable}
                 className={`p-2 rounded text-xs ${
-                  affordable 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-gray-600 cursor-not-allowed'
+                  affordable
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-gray-600 cursor-not-allowed"
                 }`}
               >
-                <div>{buildingType.replace('_', ' ')}</div>
+                <div>{buildingType.replace("_", " ")}</div>
                 <div className="text-xs">
                   {cost.wood > 0 && `🪵${cost.wood} `}
                   {cost.food > 0 && `🌾${cost.food} `}
@@ -207,11 +248,11 @@ export const GameUI: React.FC = () => {
     <div className="fixed bottom-0 left-0 right-0 bg-black bg-opacity-80 p-4">
       <div className="flex gap-4">
         <ResourceDisplay />
-        
+
         {selectedUnits.length === 1 && <UnitPanel />}
         {selectedBuildings.length === 1 && <BuildingPanel />}
         {selectedUnits.length > 0 && <BuildingMenu />}
-        
+
         {selectedUnits.length === 0 && selectedBuildings.length === 0 && (
           <div className="bg-gray-800 text-white p-4 rounded">
             <h3 className="text-lg font-bold">Controls</h3>

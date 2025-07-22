@@ -1,8 +1,8 @@
-import type { Position } from '../types/game';
+import type { Position } from "../types/game";
 
 export interface ResourceNode {
   id: string;
-  type: 'oil' | 'steel' | 'energy';
+  type: "oil" | "steel" | "energy";
   position: Position;
   maxResources: number;
   currentResources: number;
@@ -15,9 +15,9 @@ export interface ResourceNode {
 
 export interface ResourceBuilding {
   id: string;
-  type: 'power_plant' | 'refinery' | 'mine';
+  type: "power_plant" | "refinery" | "mine";
   position: Position;
-  resourceType: 'oil' | 'steel' | 'energy';
+  resourceType: "oil" | "steel" | "energy";
   productionRate: number;
   playerId: string;
 }
@@ -33,10 +33,10 @@ export class ResourceManager {
   }
 
   private generateResourceNodes(): void {
-    const nodeTypes: ResourceNode['type'][] = ['oil', 'steel', 'energy'];
+    const nodeTypes: ResourceNode["type"][] = ["oil", "steel", "energy"];
     const nodesPerType = 4; // Limited number of nodes
 
-    nodeTypes.forEach(nodeType => {
+    nodeTypes.forEach((nodeType) => {
       for (let i = 0; i < nodesPerType; i++) {
         const position = this.findValidNodePosition();
         if (position) {
@@ -46,11 +46,12 @@ export class ResourceManager {
             position,
             maxResources: 3000 + Math.random() * 2000, // Limited resources per node
             currentResources: 0,
-            extractionRate: nodeType === 'oil' ? 30 : nodeType === 'steel' ? 25 : 35,
+            extractionRate:
+              nodeType === "oil" ? 30 : nodeType === "steel" ? 25 : 35,
             workersAssigned: [],
             maxWorkers: 3,
             isExhausted: false,
-            radius: 2
+            radius: 2,
           };
           node.currentResources = node.maxResources;
           this.resourceNodes.set(node.id, node);
@@ -65,8 +66,12 @@ export class ResourceManager {
     const minDistanceBetweenNodes = 8;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const x = minDistanceFromEdge + Math.random() * (this.mapSize.width - 2 * minDistanceFromEdge);
-      const y = minDistanceFromEdge + Math.random() * (this.mapSize.height - 2 * minDistanceFromEdge);
+      const x =
+        minDistanceFromEdge +
+        Math.random() * (this.mapSize.width - 2 * minDistanceFromEdge);
+      const y =
+        minDistanceFromEdge +
+        Math.random() * (this.mapSize.height - 2 * minDistanceFromEdge);
 
       // Check distance from other nodes
       let validPosition = true;
@@ -95,8 +100,8 @@ export class ResourceManager {
   public getNodeAt(position: Position): ResourceNode | undefined {
     for (const node of this.resourceNodes.values()) {
       const distance = Math.sqrt(
-        Math.pow(position.x - node.position.x, 2) + 
-        Math.pow(position.y - node.position.y, 2)
+        Math.pow(position.x - node.position.x, 2) +
+          Math.pow(position.y - node.position.y, 2)
       );
       if (distance <= node.radius) {
         return node;
@@ -107,7 +112,11 @@ export class ResourceManager {
 
   public assignWorkerToNode(workerId: string, nodeId: string): boolean {
     const node = this.resourceNodes.get(nodeId);
-    if (node && !node.isExhausted && node.workersAssigned.length < node.maxWorkers) {
+    if (
+      node &&
+      !node.isExhausted &&
+      node.workersAssigned.length < node.maxWorkers
+    ) {
       if (!node.workersAssigned.includes(workerId)) {
         node.workersAssigned.push(workerId);
         return true;
@@ -126,7 +135,10 @@ export class ResourceManager {
     }
   }
 
-  public extractResources(nodeId: string, deltaTime: number): { type: 'oil' | 'steel' | 'energy'; amount: number } | null {
+  public extractResources(
+    nodeId: string,
+    deltaTime: number
+  ): { type: "oil" | "steel" | "energy"; amount: number } | null {
     const node = this.resourceNodes.get(nodeId);
     if (!node || node.isExhausted || node.workersAssigned.length === 0) {
       return null;
@@ -146,7 +158,7 @@ export class ResourceManager {
 
     return {
       type: node.type,
-      amount: extractionAmount
+      amount: extractionAmount,
     };
   }
 
@@ -158,8 +170,12 @@ export class ResourceManager {
     this.resourceBuildings.delete(buildingId);
   }
 
-  public generateResourcesFromBuildings(deltaTime: number): { [playerId: string]: { oil: number; steel: number; energy: number } } {
-    const playerResources: { [playerId: string]: { oil: number; steel: number; energy: number } } = {};
+  public generateResourcesFromBuildings(deltaTime: number): {
+    [playerId: string]: { oil: number; steel: number; energy: number };
+  } {
+    const playerResources: {
+      [playerId: string]: { oil: number; steel: number; energy: number };
+    } = {};
 
     for (const building of this.resourceBuildings.values()) {
       if (!playerResources[building.playerId]) {
@@ -173,15 +189,22 @@ export class ResourceManager {
     return playerResources;
   }
 
-  public getNearestNodeOfType(position: Position, resourceType: 'oil' | 'steel' | 'energy'): ResourceNode | null {
+  public getNearestNodeOfType(
+    position: Position,
+    resourceType: "oil" | "steel" | "energy"
+  ): ResourceNode | null {
     let nearestNode: ResourceNode | null = null;
     let nearestDistance = Infinity;
 
     for (const node of this.resourceNodes.values()) {
-      if (node.type === resourceType && !node.isExhausted && node.workersAssigned.length < node.maxWorkers) {
+      if (
+        node.type === resourceType &&
+        !node.isExhausted &&
+        node.workersAssigned.length < node.maxWorkers
+      ) {
         const distance = Math.sqrt(
-          Math.pow(position.x - node.position.x, 2) + 
-          Math.pow(position.y - node.position.y, 2)
+          Math.pow(position.x - node.position.x, 2) +
+            Math.pow(position.y - node.position.y, 2)
         );
 
         if (distance < nearestDistance) {
@@ -194,7 +217,11 @@ export class ResourceManager {
     return nearestNode;
   }
 
-  public getResourceStatistics(): { totalNodes: number; exhaustedNodes: number; activeWorkers: number } {
+  public getResourceStatistics(): {
+    totalNodes: number;
+    exhaustedNodes: number;
+    activeWorkers: number;
+  } {
     const totalNodes = this.resourceNodes.size;
     let exhaustedNodes = 0;
     let activeWorkers = 0;

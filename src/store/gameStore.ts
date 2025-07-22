@@ -18,7 +18,7 @@ import type { ResourceNode } from "../systems/ResourceManager";
 interface GameStore extends GameState {
   // Resource system
   resourceManager: ResourceManager | null;
-  
+
   // Game controls
   startGame: (config: any) => void;
   pauseGame: () => void;
@@ -46,7 +46,10 @@ interface GameStore extends GameState {
   getResourceNodes: () => ResourceNode[];
   assignWorkerToNode: (workerId: string, nodeId: string) => void;
   removeWorkerFromNode: (workerId: string) => void;
-  extractResources: (nodeId: string, deltaTime: number) => { type: 'oil' | 'steel' | 'energy'; amount: number } | null;
+  extractResources: (
+    nodeId: string,
+    deltaTime: number
+  ) => { type: "oil" | "steel" | "energy"; amount: number } | null;
 
   // Game logic
   tick: () => void;
@@ -176,7 +179,10 @@ export const useGameStore = create<GameStore>()(
       });
 
       // Initialize ResourceManager with map dimensions
-      const resourceManager = new ResourceManager({ width: mapWidth, height: mapHeight });
+      const resourceManager = new ResourceManager({
+        width: mapWidth,
+        height: mapHeight,
+      });
 
       set({
         gameId,
@@ -519,7 +525,7 @@ export const useGameStore = create<GameStore>()(
         const playerBuildings = updatedBuildings.filter(
           (b) => b.playerId === player.id && b.isConstructed
         );
-        
+
         // Traditional building-based resource generation
         const buildingResourceGain = {
           oil:
@@ -538,16 +544,21 @@ export const useGameStore = create<GameStore>()(
         let nodeResourceGain = { oil: 0, steel: 0, energy: 0 };
         if (state.resourceManager) {
           const nodes = state.resourceManager.getResourceNodes();
-          nodes.forEach(node => {
+          nodes.forEach((node) => {
             if (node.workersAssigned.length > 0) {
               // Check if any workers belong to this player
-              const playerWorkers = node.workersAssigned.filter(workerId => {
-                const worker = state.units.find(u => u.id === workerId && u.playerId === player.id);
+              const playerWorkers = node.workersAssigned.filter((workerId) => {
+                const worker = state.units.find(
+                  (u) => u.id === workerId && u.playerId === player.id
+                );
                 return worker !== undefined;
               });
-              
+
               if (playerWorkers.length > 0) {
-                const extraction = state.resourceManager!.extractResources(node.id, 1000/60);
+                const extraction = state.resourceManager!.extractResources(
+                  node.id,
+                  1000 / 60
+                );
                 if (extraction) {
                   nodeResourceGain[extraction.type] += extraction.amount;
                 }

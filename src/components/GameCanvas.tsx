@@ -47,7 +47,7 @@ export const GameCanvas: React.FC = () => {
         camera: localCamera,
         mapSize,
       });
-      
+
       // Initialize 3D renderer
       renderer3DRef.current = new Renderer3D(canvasRef.current);
     }
@@ -87,7 +87,7 @@ export const GameCanvas: React.FC = () => {
     if (use3D && renderer3DRef.current) {
       // Use 3D renderer
       renderer3DRef.current.render(units, buildings, 16); // ~60 FPS
-      
+
       // Update camera from local camera
       renderer3DRef.current.setCamera({ x: localCamera.x, y: localCamera.y });
     } else if (rendererRef.current) {
@@ -265,7 +265,7 @@ export const GameCanvas: React.FC = () => {
         setLocalCamera(newCamera);
         setCamera(newCamera);
       }
-      
+
       setDragStart({ x: e.clientX, y: e.clientY });
     }
   };
@@ -306,36 +306,39 @@ export const GameCanvas: React.FC = () => {
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    
+
     if (use3D && renderer3DRef.current) {
       // 3D zoom - more responsive
       const zoomDelta = e.deltaY > 0 ? -0.15 : 0.15;
       renderer3DRef.current.zoomCamera(zoomDelta);
     } else {
       // 2D zoom - improved with better limits and smoothness
-      const newZoom = Math.max(0.1, Math.min(5.0, localCamera.zoom * zoomFactor));
-      
+      const newZoom = Math.max(
+        0.1,
+        Math.min(5.0, localCamera.zoom * zoomFactor)
+      );
+
       // Calculate zoom center point relative to mouse position
       const rect = canvasRef.current?.getBoundingClientRect();
       if (rect) {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        
+
         // Convert mouse position to world coordinates
         const worldX = localCamera.x + mouseX / (TILE_SIZE * localCamera.zoom);
         const worldY = localCamera.y + mouseY / (TILE_SIZE * localCamera.zoom);
-        
+
         // Adjust camera position to zoom towards mouse
         const zoomRatio = newZoom / localCamera.zoom;
         const newCameraX = worldX - (worldX - localCamera.x) / zoomRatio;
         const newCameraY = worldY - (worldY - localCamera.y) / zoomRatio;
-        
+
         const newCamera = {
           x: Math.max(0, Math.min(mapSize.width - 10, newCameraX)),
           y: Math.max(0, Math.min(mapSize.height - 10, newCameraY)),
           zoom: newZoom,
         };
-        
+
         setLocalCamera(newCamera);
         setCamera(newCamera);
       }
@@ -352,14 +355,14 @@ export const GameCanvas: React.FC = () => {
       <button
         onClick={() => setUse3D(!use3D)}
         className={`absolute top-4 right-4 z-10 px-4 py-2 rounded font-semibold transition-colors ${
-          use3D 
-            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-            : 'bg-gray-600 text-white hover:bg-gray-700'
+          use3D
+            ? "bg-blue-600 text-white hover:bg-blue-700"
+            : "bg-gray-600 text-white hover:bg-gray-700"
         }`}
       >
-        {use3D ? '3D Mode' : '2D Mode'}
+        {use3D ? "3D Mode" : "2D Mode"}
       </button>
-      
+
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}

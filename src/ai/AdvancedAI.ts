@@ -73,7 +73,12 @@ export class AdvancedAI {
         targetWorkerCount: 15,
         resourcePriority: "balanced",
         expansionThreshold: 500,
-        buildingQueue: ["power_plant", "barracks", "vehicle_factory", "defense_turret"],
+        buildingQueue: [
+          "power_plant",
+          "barracks",
+          "vehicle_factory",
+          "defense_turret",
+        ],
         nextBuildTime: 0,
       },
       militaryPlan: {
@@ -83,7 +88,12 @@ export class AdvancedAI {
         defensePositions: [],
         aggressiveMode: true,
         lastAttackTime: 0,
-        unitProductionQueue: ["infantry", "infantry", "tank", "missile_launcher"],
+        unitProductionQueue: [
+          "infantry",
+          "infantry",
+          "tank",
+          "missile_launcher",
+        ],
       },
       currentObjectives: [],
       enemyThreatLevel: 0,
@@ -228,7 +238,7 @@ export class AdvancedAI {
     player: Player
   ): void {
     const currentTime = Date.now();
-    
+
     // Build workers if needed (using engineer units as workers)
     const workerCount = myUnits.filter((u) => u.type === "engineer").length;
     if (workerCount < this.strategicState.economicPlan.targetWorkerCount) {
@@ -239,21 +249,24 @@ export class AdvancedAI {
     this.assignWorkersToResources(myUnits);
 
     // Intelligent building construction based on queue and resources
-    const totalResources = player.resources.oil + player.resources.steel + player.resources.energy;
-    
+    const totalResources =
+      player.resources.oil + player.resources.steel + player.resources.energy;
+
     // Only build if we have significant resources and haven't built recently
-    if (currentTime >= this.strategicState.economicPlan.nextBuildTime && 
-        totalResources >= 300 && // Higher threshold
-        this.shouldBuildMore(myBuildings, totalResources)) {
-      
+    if (
+      currentTime >= this.strategicState.economicPlan.nextBuildTime &&
+      totalResources >= 300 && // Higher threshold
+      this.shouldBuildMore(myBuildings, totalResources)
+    ) {
       if (this.strategicState.economicPlan.buildingQueue.length > 0) {
-        const nextBuilding = this.strategicState.economicPlan.buildingQueue.shift()!;
-        
+        const nextBuilding =
+          this.strategicState.economicPlan.buildingQueue.shift()!;
+
         // Check if we have required resources for this specific building
         if (this.canAffordBuilding(nextBuilding, player.resources)) {
           this.tryBuildBuilding(nextBuilding, myBuildings);
           this.strategicState.economicPlan.nextBuildTime = currentTime + 15000; // Wait 15 seconds between builds
-          
+
           // Replenish building queue based on current needs
           this.updateBuildingQueue(myBuildings, myUnits.length);
         } else {
@@ -270,12 +283,18 @@ export class AdvancedAI {
     }
 
     // Expand if resources are high and we have enough infrastructure
-    if (totalResources >= this.strategicState.economicPlan.expansionThreshold && myBuildings.length >= 3) {
+    if (
+      totalResources >= this.strategicState.economicPlan.expansionThreshold &&
+      myBuildings.length >= 3
+    ) {
       this.tryExpand(myBuildings);
     }
   }
 
-  private canAffordBuilding(buildingType: BuildingType, resources: Player['resources']): boolean {
+  private canAffordBuilding(
+    buildingType: BuildingType,
+    resources: Player["resources"]
+  ): boolean {
     // Define building costs
     const costs = {
       command_center: { oil: 500, steel: 300, energy: 200 },
@@ -288,60 +307,73 @@ export class AdvancedAI {
     const cost = costs[buildingType as keyof typeof costs];
     if (!cost) return false;
 
-    return resources.oil >= cost.oil && 
-           resources.steel >= cost.steel && 
-           resources.energy >= cost.energy;
+    return (
+      resources.oil >= cost.oil &&
+      resources.steel >= cost.steel &&
+      resources.energy >= cost.energy
+    );
   }
 
-  private updateBuildingQueue(myBuildings: Building[], totalUnits: number): void {
+  private updateBuildingQueue(
+    myBuildings: Building[],
+    totalUnits: number
+  ): void {
     const buildingCounts = {
-      power_plant: myBuildings.filter(b => b.type === 'power_plant').length,
-      barracks: myBuildings.filter(b => b.type === 'barracks').length,
-      vehicle_factory: myBuildings.filter(b => b.type === 'vehicle_factory').length,
-      defense_turret: myBuildings.filter(b => b.type === 'defense_turret').length,
+      power_plant: myBuildings.filter((b) => b.type === "power_plant").length,
+      barracks: myBuildings.filter((b) => b.type === "barracks").length,
+      vehicle_factory: myBuildings.filter((b) => b.type === "vehicle_factory")
+        .length,
+      defense_turret: myBuildings.filter((b) => b.type === "defense_turret")
+        .length,
     };
 
     // Smart building priorities based on current state - more conservative
     if (buildingCounts.power_plant < 1) {
-      this.strategicState.economicPlan.buildingQueue.push('power_plant');
+      this.strategicState.economicPlan.buildingQueue.push("power_plant");
     }
-    
+
     if (buildingCounts.barracks < 1) {
-      this.strategicState.economicPlan.buildingQueue.push('barracks');
+      this.strategicState.economicPlan.buildingQueue.push("barracks");
     }
-    
+
     if (buildingCounts.vehicle_factory < 1 && totalUnits > 8) {
-      this.strategicState.economicPlan.buildingQueue.push('vehicle_factory');
+      this.strategicState.economicPlan.buildingQueue.push("vehicle_factory");
     }
-    
+
     if (buildingCounts.defense_turret < 2) {
-      this.strategicState.economicPlan.buildingQueue.push('defense_turret');
+      this.strategicState.economicPlan.buildingQueue.push("defense_turret");
     }
 
     // Add more production facilities only if army is large
     if (totalUnits > 15) {
       if (buildingCounts.barracks < 2) {
-        this.strategicState.economicPlan.buildingQueue.push('barracks');
+        this.strategicState.economicPlan.buildingQueue.push("barracks");
       }
       if (buildingCounts.power_plant < 2) {
-        this.strategicState.economicPlan.buildingQueue.push('power_plant');
+        this.strategicState.economicPlan.buildingQueue.push("power_plant");
       }
     }
   }
 
-  private shouldBuildMore(myBuildings: Building[], totalResources: number): boolean {
+  private shouldBuildMore(
+    myBuildings: Building[],
+    totalResources: number
+  ): boolean {
     // Don't build if we have too many buildings relative to resources
     const buildingCount = myBuildings.length;
     const resourceThreshold = buildingCount * 400; // Each building should cost about 400 resources
-    
+
     return totalResources > resourceThreshold && buildingCount < 8; // Max 8 buildings
   }
 
-  private needsMoreBuildings(myBuildings: Building[], totalUnits: number): boolean {
+  private needsMoreBuildings(
+    myBuildings: Building[],
+    totalUnits: number
+  ): boolean {
     const buildingCount = myBuildings.length;
-    
+
     // Only build more buildings if we have a good unit-to-building ratio
-    return (totalUnits / Math.max(1, buildingCount)) > 3 && buildingCount < 6;
+    return totalUnits / Math.max(1, buildingCount) > 3 && buildingCount < 6;
   }
 
   private assignWorkersToResources(myUnits: Unit[]): void {
@@ -407,7 +439,8 @@ export class AdvancedAI {
 
     // Continuous unit production based on queue
     if (this.strategicState.militaryPlan.unitProductionQueue.length > 0) {
-      const nextUnit = this.strategicState.militaryPlan.unitProductionQueue.shift()!;
+      const nextUnit =
+        this.strategicState.militaryPlan.unitProductionQueue.shift()!;
       this.tryTrainUnit(nextUnit, myBuildings);
       // Always replenish production queue
       this.updateUnitProductionQueue(militaryUnits.length, enemyUnits.length);
@@ -433,71 +466,91 @@ export class AdvancedAI {
     this.executeCombatTactics(militaryUnits, enemyUnits);
 
     // Aggressive attack strategy
-    if (this.strategicState.militaryPlan.aggressiveMode && 
-        militaryUnits.length >= this.strategicState.militaryPlan.attackThreshold &&
-        currentTime - this.strategicState.militaryPlan.lastAttackTime > 30000) { // Attack every 30 seconds
-      
+    if (
+      this.strategicState.militaryPlan.aggressiveMode &&
+      militaryUnits.length >=
+        this.strategicState.militaryPlan.attackThreshold &&
+      currentTime - this.strategicState.militaryPlan.lastAttackTime > 30000
+    ) {
+      // Attack every 30 seconds
+
       this.launchCoordinatedAttack(militaryUnits, enemyUnits);
       this.strategicState.militaryPlan.lastAttackTime = currentTime;
     }
   }
 
-  private updateUnitProductionQueue(currentMilitaryCount: number, enemyCount: number): void {
+  private updateUnitProductionQueue(
+    currentMilitaryCount: number,
+    enemyCount: number
+  ): void {
     // Smart unit production based on current situation
     const queue = this.strategicState.militaryPlan.unitProductionQueue;
-    
+
     // Always maintain basic infantry
     if (currentMilitaryCount < 3) {
-      queue.push('infantry', 'infantry');
+      queue.push("infantry", "infantry");
     }
-    
+
     // Add heavy units as we grow
     if (currentMilitaryCount >= 3) {
-      queue.push('tank');
+      queue.push("tank");
     }
-    
+
     // Counter enemy with specialized units
     if (enemyCount > 5) {
-      queue.push('missile_launcher', 'helicopter');
+      queue.push("missile_launcher", "helicopter");
     }
-    
+
     // Advanced units for late game
     if (currentMilitaryCount > 8) {
-      queue.push('jet', 'drone');
+      queue.push("jet", "drone");
     }
-    
+
     // Always have some basic units
-    queue.push('infantry', 'tank');
+    queue.push("infantry", "tank");
   }
 
-  private launchCoordinatedAttack(militaryUnits: Unit[], enemyUnits: Unit[]): void {
+  private launchCoordinatedAttack(
+    militaryUnits: Unit[],
+    enemyUnits: Unit[]
+  ): void {
     if (enemyUnits.length === 0) return;
 
     // Find enemy base or concentrated enemy forces
     const enemyCenter = this.findEnemyCenter(enemyUnits);
-    
+
     // Select attack force (leave some for defense)
-    const attackForce = militaryUnits.slice(0, Math.floor(militaryUnits.length * 0.7));
-    
+    const attackForce = militaryUnits.slice(
+      0,
+      Math.floor(militaryUnits.length * 0.7)
+    );
+
     if (attackForce.length >= 3) {
       // Create coordinated attack group
       this.unitController.createCombatGroup(
-        attackForce.map(u => u.id),
-        'attack',
+        attackForce.map((u) => u.id),
+        "attack",
         enemyCenter
       );
-      
-      console.log(`AI launching coordinated attack with ${attackForce.length} units at position`, enemyCenter);
+
+      console.log(
+        `AI launching coordinated attack with ${attackForce.length} units at position`,
+        enemyCenter
+      );
     }
   }
 
   private findEnemyCenter(enemyUnits: Unit[]): Position {
     if (enemyUnits.length === 0) return { x: 25, y: 25 };
-    
+
     // Find the center of enemy forces
-    const avgX = enemyUnits.reduce((sum, unit) => sum + unit.position.x, 0) / enemyUnits.length;
-    const avgY = enemyUnits.reduce((sum, unit) => sum + unit.position.y, 0) / enemyUnits.length;
-    
+    const avgX =
+      enemyUnits.reduce((sum, unit) => sum + unit.position.x, 0) /
+      enemyUnits.length;
+    const avgY =
+      enemyUnits.reduce((sum, unit) => sum + unit.position.y, 0) /
+      enemyUnits.length;
+
     return { x: Math.round(avgX), y: Math.round(avgY) };
   }
 
@@ -603,7 +656,7 @@ export class AdvancedAI {
         if (vulnerableTargets.length > 0) {
           const target = vulnerableTargets[0];
           // Focus fire on vulnerable target
-          group.unitIds.forEach(unitId => {
+          group.unitIds.forEach((unitId) => {
             this.unitController.attackTarget(unitId, target.id, 9);
           });
         }

@@ -96,20 +96,25 @@ export class TerrainManager {
   private clearSpawnAreas(): void {
     // Clear areas around player spawn points
     const spawnAreas = [
-      { x: 5, y: 5 },     // Top-left spawn
+      { x: 5, y: 5 }, // Top-left spawn
       { x: this.mapSize.width - 5, y: this.mapSize.height - 5 }, // Bottom-right spawn
     ];
 
-    spawnAreas.forEach(spawn => {
+    spawnAreas.forEach((spawn) => {
       for (let dy = -3; dy <= 3; dy++) {
         for (let dx = -3; dx <= 3; dx++) {
           const x = spawn.x + dx;
           const y = spawn.y + dy;
-          
-          if (x >= 0 && x < this.mapSize.width && y >= 0 && y < this.mapSize.height) {
+
+          if (
+            x >= 0 &&
+            x < this.mapSize.width &&
+            y >= 0 &&
+            y < this.mapSize.height
+          ) {
             this.terrain[y][x] = {
               position: { x, y },
-              type: 'grass',
+              type: "grass",
               isPassable: true,
               movementCost: 1,
             };

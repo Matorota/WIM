@@ -23,8 +23,24 @@ export interface Player {
   isAlive: boolean;
 }
 
-export type UnitType = 'villager' | 'soldier' | 'archer' | 'cavalry' | 'tank' | 'engineer';
-export type BuildingType = 'town_center' | 'house' | 'barracks' | 'archery_range' | 'stable' | 'factory' | 'farm' | 'lumber_mill' | 'mining_camp' | 'tower';
+export type UnitType =
+  | "villager"
+  | "soldier"
+  | "archer"
+  | "cavalry"
+  | "tank"
+  | "engineer";
+export type BuildingType =
+  | "town_center"
+  | "house"
+  | "barracks"
+  | "archery_range"
+  | "stable"
+  | "factory"
+  | "farm"
+  | "lumber_mill"
+  | "mining_camp"
+  | "tower";
 
 export interface Unit {
   id: string;
@@ -39,7 +55,13 @@ export interface Unit {
   isSelected: boolean;
   isMoving: boolean;
   target?: Position;
-  task: 'idle' | 'gathering' | 'building' | 'attacking' | 'moving' | 'depositing';
+  task:
+    | "idle"
+    | "gathering"
+    | "building"
+    | "attacking"
+    | "moving"
+    | "depositing";
   gatheringTarget?: string; // Resource node ID
   carryingResources?: {
     type: keyof Resources;
@@ -89,29 +111,29 @@ export interface GameState {
   gameSpeed: number;
   currentTick: number;
   gameTime: number;
-  
+
   players: Player[];
   currentPlayerId: string;
-  
+
   units: Unit[];
   buildings: Building[];
   resourceNodes: ResourceNode[];
-  
+
   mapSize: { width: number; height: number };
   selectedUnits: string[];
   selectedBuildings: string[];
-  
+
   camera: { x: number; y: number; zoom: number };
-  
-  gameMode: 'singleplayer' | 'multiplayer';
-  victoryCondition: 'domination' | 'economic' | 'time';
+
+  gameMode: "singleplayer" | "multiplayer";
+  victoryCondition: "domination" | "economic" | "time";
 }
 
 export interface GameConfig {
-  mapSize: 'small' | 'medium' | 'large';
-  gameMode: 'singleplayer' | 'multiplayer';
+  mapSize: "small" | "medium" | "large";
+  gameMode: "singleplayer" | "multiplayer";
   aiOpponents: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-  victoryCondition: 'domination' | 'economic' | 'time';
-  startingResources: 'low' | 'medium' | 'high';
+  difficulty: "easy" | "medium" | "hard";
+  victoryCondition: "domination" | "economic" | "time";
+  startingResources: "low" | "medium" | "high";
 }
